@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Claudiogram — every token a trace</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23080C0A'/%3E%3Cpolyline points='1,9 5,9 7,3 9,13 11,9 15,9' fill='none' stroke='%2353FCA1' stroke-width='1.5'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+
+<header id="hdr">
+  <div class="hdr-left">
+    <button id="led" class="led led-connecting" type="button" aria-label="SSE connection status" title="CONNECTING"></button>
+    <span class="wordmark">CLAUDIOGRAM</span>
+    <span id="dateline" class="dateline"></span>
+  </div>
+  <button id="miniWrap" class="mini-wrap" type="button" title="Live trace — click for F1 PULSE" aria-label="Live trace — go to Pulse view">
+    <canvas id="miniTrace"></canvas>
+  </button>
+  <div class="hdr-right">
+    <div class="hdr-today" id="hdrTodayWrap" title="Today">
+      <span class="hdr-today-label">TODAY</span>
+      <span id="hdrToday" class="hdr-today-val">0</span>
+      <span id="hdrTodayUnit" class="hdr-today-unit">tok</span>
+    </div>
+    <div class="latch-wrap">
+      <div id="latch" class="latch" role="switch" aria-checked="false" tabindex="0"
+           aria-label="Metric latch: tokens or API-equivalent dollars (press m)" title="Metric latch — press m">
+      <span class="latch-pos latch-tok">TOK</span>
+      <span class="latch-pos latch-eq">$EQ</span>
+      <div class="knob"><i></i><i></i><i></i></div>
+      </div>
+      <div class="latch-caption">API-EQUIVALENT</div>
+    </div>
+  </div>
+</header>
+
+<nav id="rail" aria-label="Views">
+  <button class="fkey" type="button" data-view="pulse" title="F1 · PULSE (1)">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><polyline points="1,12 6,12 8,4 11,17 13,12 19,12" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>
+    <span>PULSE</span>
+  </button>
+  <button class="fkey" type="button" data-view="rhythm" title="F2 · RHYTHM (2)">
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <rect x="2" y="2" width="6" height="6" fill="currentColor" opacity=".45"/><rect x="11" y="2" width="6" height="6" fill="currentColor"/>
+      <rect x="2" y="11" width="6" height="6" fill="currentColor"/><rect x="11" y="11" width="6" height="6" fill="currentColor" opacity=".45"/>
+    </svg>
+    <span>RHYTHM</span>
+  </button>
+  <button class="fkey" type="button" data-view="cost" title="F3 · COST (3)">
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M14 4 H7 L11 10 L7 16 H14" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <line x1="16" y1="3" x2="16" y2="7" stroke="currentColor" stroke-width="1.2"/>
+    </svg>
+    <span>COST</span>
+  </button>
+  <button class="fkey" type="button" data-view="capsule" title="F4 · CAPSULE (4)">
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <circle cx="10" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/>
+      <circle cx="10" cy="8" r="1.5" fill="currentColor"/>
+      <path d="M10 13 V18 H16" fill="none" stroke="currentColor" stroke-width="1.6"/>
+    </svg>
+    <span>CAPSULE</span>
+  </button>
+  <button class="fkey fkey-prj" type="button" id="prjKey" hidden title="Project view">
+    <span class="prj-letter">P</span>
+    <span>PRJ</span>
+  </button>
+  <button class="fkey rail-toggle" type="button" id="railToggle" title="Expand panel" aria-label="Expand navigation panel" aria-expanded="false">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M8 4 L14 10 L8 16" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    <span>HIDE</span>
+  </button>
+  <div class="rail-version">CG·1.0.0</div>
+</nav>
+
+<div id="crumb" class="crumb" hidden></div>
+
+<main id="main">
+  <div id="view"></div>
+</main>
+
+<div id="scrim" class="scrim" hidden></div>
+<aside id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Day inspector" tabindex="-1" hidden></aside>
+<div id="tooltip" class="tip" role="status" hidden></div>
+
+<script type="module" src="/app.js"></script>
+</body>
+</html>

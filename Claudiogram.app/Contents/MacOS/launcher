@@ -1,0 +1,72 @@
+#!/bin/bash
+# Claudiogram — double-clickable launcher.
+# Starts the server if needed (requires Node.js >= 22.5) and opens the dashboard.
+set -u
+
+# The .app lives in the project root, so resolve the project from our own path
+# (launcher is at <project>/Claudiogram.app/Contents/MacOS/launcher).
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT="$(cd "$SELF_DIR/../../.." && pwd)"
+PORT="${CLAUDIOGRAM_PORT:-4242}"
+URL="http://localhost:$PORT"
+LOG="$HOME/Library/Logs/claudiogram.log"
+
+note() {
+  /usr/bin/osascript -e "display dialog \"$1\" with title \"Claudiogram\" buttons {\"OK\"} default button 1 with icon caution" >/dev/null 2>&1
+}
+
+# Already running? Just open the dashboard.
+if /usr/bin/curl -s -o /dev/null --max-time 2 "$URL"; then
+  /usr/bin/open "$URL"
+  exit 0
+fi
+
+# Find node — Finder-launched apps get a minimal PATH, so probe known homes.
+NODE=""
+for c in /opt/homebrew/bin/node /usr/local/bin/node /opt/local/bin/node; do
+  if [ -x "$c" ]; then NODE="$c"; break; fi
+done
+if [ -z "$NODE" ]; then
+  nvm_node=$(ls -t "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | head -1)
+  if [ -n "$nvm_node" ] && [ -x "$nvm_node" ]; then NODE="$nvm_node"; fi
+fi
+if [ -z "$NODE" ]; then
+  NODE=$(command -v node 2>/dev/null || true)
+fi
+
+if [ -z "$NODE" ]; then
+  btn=$(/usr/bin/osascript -e 'display dialog "Claudiogram needs Node.js 22.5 or newer, and none was found on this Mac.
+
+Install the LTS version from nodejs.org, then double-click Claudiogram again." with title "Claudiogram" buttons {"Cancel","Open nodejs.org"} default button "Open nodejs.org" with icon caution' 2>/dev/null)
+  case "$btn" in *"Open nodejs.org"*) /usr/bin/open "https://nodejs.org/";; esac
+  exit 1
+fi
+
+# Version gate: node:sqlite needs >= 22.5
+ver=$("$NODE" -p 'process.versions.node' 2>/dev/null || echo "0.0.0")
+major=${ver%%.*}; rest=${ver#*.}; minor=${rest%%.*}
+if [ "$major" -lt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -lt 5 ]; }; then
+  note "Claudiogram needs Node.js 22.5 or newer (found $ver at $NODE). Update Node, then try again."
+  exit 1
+fi
+
+if [ ! -f "$PROJECT/server.js" ]; then
+  note "Claudiogram couldn't find server.js next to the app. Keep Claudiogram.app inside the Claudiogram folder (drag it to the Dock for quick access — don't move it out)."
+  exit 1
+fi
+
+mkdir -p "$(dirname "$LOG")"
+cd "$PROJECT" || exit 1
+PORT="$PORT" nohup "$NODE" server.js >> "$LOG" 2>&1 &
+
+# Wait for the server to come up (first-ever scan can take a few seconds).
+for _ in $(seq 1 60); do
+  if /usr/bin/curl -s -o /dev/null --max-time 1 "$URL"; then
+    /usr/bin/open "$URL"
+    exit 0
+  fi
+  sleep 0.5
+done
+
+note "Claudiogram did not start in time. Check the log at: $LOG"
+exit 1

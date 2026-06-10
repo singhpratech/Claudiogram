@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npx tsc --noEmit)",
+      "Bash(npx tsc --noEmit *)",
+      "Bash(curl -sI *)",
+      "Bash(curl -sLI *)",
+      "Bash(curl -s http://localhost*)",
+      "Bash(node --check *)"
+    ]
+  }
+}
