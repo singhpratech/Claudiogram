@@ -46,11 +46,14 @@ for Node, starts the server if it isn't already running, and opens the dashboard
 
 | Platform | Launcher |
 |----------|----------|
-| macOS    | **`Claudiogram.app`** — drag it to the Dock (keep it inside this folder) |
+| macOS    | **`Claudiogram.app`** — drag it to the Dock (keep it inside this folder). First launch: right-click → **Open** (the app is unsigned, Gatekeeper asks once) |
 | Windows  | **`Claudiogram.bat`** — run `powershell -ExecutionPolicy Bypass -File scripts\make-shortcut.ps1` once for a Desktop shortcut with the app icon and no console window |
-| Linux    | **`claudiogram.sh`** (wire it to a `.desktop` entry if you like) |
+| Linux    | **`claudiogram.sh`** — run `sh scripts/make-desktop.sh` once to install a per-user app-menu entry with the icon (no root; uninstall = delete two files, the script prints them) |
 
+All launchers find Node themselves (Homebrew, nvm, volta, fnm, asdf, n, …),
+survive install paths with spaces, and reuse an already-running server.
 `PORT=xxxx` changes the port (`CLAUDIOGRAM_PORT` for the launchers).
+Windows needs build 1803+ (built-in `curl`).
 
 ## The four instruments
 

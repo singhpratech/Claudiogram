@@ -11,10 +11,10 @@ URL="http://localhost:$PORT"
 LOG="${XDG_STATE_HOME:-$HOME/.local/state}/claudiogram.log"
 
 open_url() {
-  if command -v xdg-open >/dev/null 2>&1; then xdg-open "$URL" >/dev/null 2>&1 &
-  elif command -v open >/dev/null 2>&1; then open "$URL"
-  else echo "Dashboard ready at: $URL"
-  fi
+  if command -v xdg-open >/dev/null 2>&1 && xdg-open "$URL" >/dev/null 2>&1; then return 0; fi
+  if command -v gio >/dev/null 2>&1 && gio open "$URL" >/dev/null 2>&1; then return 0; fi
+  if command -v open >/dev/null 2>&1 && open "$URL" >/dev/null 2>&1; then return 0; fi
+  echo "Dashboard ready at: $URL"
 }
 
 alive() {
@@ -46,7 +46,9 @@ if [ ! -f "$PROJECT/server.js" ]; then
   exit 1
 fi
 
-mkdir -p "$(dirname "$LOG")"
+if ! mkdir -p "$(dirname -- "$LOG")" 2>/dev/null; then
+  LOG="${TMPDIR:-/tmp}/claudiogram.log"
+fi
 cd "$PROJECT" || exit 1
 PORT="$PORT" nohup node server.js >> "$LOG" 2>&1 &
 

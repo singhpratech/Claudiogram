@@ -1,4 +1,6 @@
 // Renders the Claudiogram app icons with zero dependencies.
+// Design: open "C" lettermark with the heartbeat trace escaping through its
+// opening, ending in a glowing sweep-head dot (the live-trace cursor).
 // Outputs: scripts/icon-master.png (1024px — source for AppIcon.icns via sips/iconutil)
 //          Claudiogram.ico         (256px PNG-in-ICO, repo root — Windows shortcuts)
 import { writeFileSync } from 'node:fs';
@@ -18,11 +20,18 @@ function render(S) {
     return Math.hypot(ax, ay) + Math.min(Math.max(dx, dy), 0) - RADIUS;
   }
 
-  // Pulse polyline — same shape as the favicon (16-unit grid), centered.
-  const SCALE = 44 * f, OFF = (S - 16 * SCALE) / 2;
-  const PTS = [[1, 9], [5, 9], [7, 3], [9, 13], [11, 9], [15, 9]]
-    .map(([x, y]) => [OFF + x * SCALE, OFF + y * SCALE]);
+  // Open "C": circle arc with a gap facing right (rounded endpoints).
+  const C_R = 300 * f, GAP_HALF = 0.96; // radians; ~55° half-opening
+  function arcDist(x, y) {
+    const dx = x - S / 2, dy = y - S / 2;
+    if (Math.abs(Math.atan2(dy, dx)) > GAP_HALF) return Math.abs(Math.hypot(dx, dy) - C_R);
+    const ex = S / 2 + C_R * Math.cos(GAP_HALF), ey = C_R * Math.sin(GAP_HALF);
+    return Math.min(Math.hypot(x - ex, y - (S / 2 + ey)), Math.hypot(x - ex, y - (S / 2 - ey)));
+  }
 
+  // Heartbeat trace through the C's opening (1024-grid coordinates).
+  const PTS = [[300, 512], [430, 512], [488, 368], [560, 650], [618, 512], [790, 512]]
+    .map(([x, y]) => [x * f, y * f]);
   function segDist(px, py, [ax, ay], [bx, by]) {
     const vx = bx - ax, vy = by - ay;
     const t = Math.max(0, Math.min(1, ((px - ax) * vx + (py - ay) * vy) / (vx * vx + vy * vy)));
@@ -34,9 +43,13 @@ function render(S) {
     return d;
   }
 
+  // Stroke + glow intensity from a distance field.
+  const ink = (d, hw, glowR, glowA) =>
+    Math.min(1, Math.max(0, 1 - Math.max(0, d - hw) / glowR) ** 2 * glowA +
+      Math.min(1, Math.max(0, 0.5 - (d - hw) / (3 * f))));
+
   // --- raster ----------------------------------------------------------------
   const BG = [8, 12, 10], GREEN = [83, 252, 161];
-  const STROKE_HW = 33 * f, GLOW_R = 150 * f;
   const px = Buffer.alloc(S * S * 4);
 
   for (let y = 0; y < S; y++) {
@@ -46,10 +59,11 @@ function render(S) {
       const cover = Math.min(1, Math.max(0, 0.5 - plate / 2)); // 2px AA edge
       if (cover === 0) continue; // transparent corner
       let [r, g, b] = BG;
-      const d = pulseDist(x + 0.5, y + 0.5);
-      const glow = Math.max(0, 1 - Math.max(0, d - STROKE_HW) / GLOW_R) ** 2 * 0.22;
-      const line = Math.min(1, Math.max(0, 0.5 - (d - STROKE_HW) / (3 * f)));
-      const a = Math.min(1, glow + line);
+      const dDot = Math.hypot(x + 0.5 - 872 * f, y + 0.5 - 512 * f) - 10 * f;
+      const a = Math.min(1,
+        ink(arcDist(x + 0.5, y + 0.5), 54 * f, 150 * f, 0.20) +
+        ink(pulseDist(x + 0.5, y + 0.5), 30 * f, 150 * f, 0.22) +
+        ink(dDot, 20 * f, 100 * f, 0.5));
       r += (GREEN[0] - r) * a; g += (GREEN[1] - g) * a; b += (GREEN[2] - b) * a;
       px[i] = r; px[i + 1] = g; px[i + 2] = b; px[i + 3] = Math.round(cover * 255);
     }

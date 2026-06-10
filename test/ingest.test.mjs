@@ -60,8 +60,9 @@ before(() => {
   fixtureHash = sha(FILE);
 });
 after(() => {
-  fs.chmodSync(FILE, 0o644);
-  fs.rmSync(TMP, { recursive: true, force: true });
+  fs.chmodSync(FILE, 0o644); // Windows: read-only attribute blocks deletion
+  try { db.close(); } catch {} // Windows: can't remove a dir holding an open usage.db
+  fs.rmSync(TMP, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 test('initial ingest: usage once per message.id, tools per line, synthetic skipped', async () => {

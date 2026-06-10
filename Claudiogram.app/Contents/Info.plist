@@ -4,7 +4,8 @@
 <dict>
   <key>CFBundleName</key><string>Claudiogram</string>
   <key>CFBundleDisplayName</key><string>Claudiogram</string>
-  <key>CFBundleIdentifier</key><string>local.claudiogram.launcher</string>
+  <key>CFBundleIdentifier</key><string>com.singhpratech.claudiogram</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
   <key>CFBundleVersion</key><string>1.0.0</string>
   <key>CFBundleShortVersionString</key><string>1.0.0</string>
   <key>CFBundlePackageType</key><string>APPL</string>

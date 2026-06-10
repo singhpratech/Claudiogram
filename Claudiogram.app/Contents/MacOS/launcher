@@ -3,66 +3,118 @@
 # Starts the server if needed (requires Node.js >= 22.5) and opens the dashboard.
 set -u
 
+# Show a dialog. The message is passed as an AppleScript argument (argv), so
+# quotes/backslashes in paths can never break or inject into the script.
+note() {
+  /usr/bin/osascript \
+    -e 'on run argv' \
+    -e 'display dialog (item 1 of argv) with title "Claudiogram" buttons {"OK"} default button 1 with icon caution' \
+    -e 'end run' -- "$1" >/dev/null 2>&1
+}
+
 # The .app lives in the project root, so resolve the project from our own path
 # (launcher is at <project>/Claudiogram.app/Contents/MacOS/launcher).
-SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT="$(cd "$SELF_DIR/../../.." && pwd)"
+SELF_DIR=$(cd "$(dirname "$0")" && pwd) || { note "Claudiogram could not resolve its own location."; exit 1; }
+PROJECT=$(cd "$SELF_DIR/../../.." && pwd) || { note "Claudiogram could not resolve the project folder above the app."; exit 1; }
 PORT="${CLAUDIOGRAM_PORT:-4242}"
 URL="http://localhost:$PORT"
 LOG="$HOME/Library/Logs/claudiogram.log"
 
-note() {
-  /usr/bin/osascript -e "display dialog \"$1\" with title \"Claudiogram\" buttons {\"OK\"} default button 1 with icon caution" >/dev/null 2>&1
-}
-
 # Already running? Just open the dashboard.
 if /usr/bin/curl -s -o /dev/null --max-time 2 "$URL"; then
-  /usr/bin/open "$URL"
+  /usr/bin/open "$URL" || note "Claudiogram is running, but the dashboard could not be opened. Visit $URL in your browser."
   exit 0
 fi
 
-# Find node — Finder-launched apps get a minimal PATH, so probe known homes.
+# --- Find a Node.js >= 22.5 (node:sqlite) ---------------------------------
+# Finder-launched apps get a minimal PATH, so probe known install homes and
+# version-gate each candidate instead of stopping at the first node found
+# (a too-old Homebrew node must not mask a new-enough nvm/volta one).
 NODE=""
-for c in /opt/homebrew/bin/node /usr/local/bin/node /opt/local/bin/node; do
-  if [ -x "$c" ]; then NODE="$c"; break; fi
+FOUND_ANY=""   # newest-looking node seen, even if too old (for the error message)
+FOUND_VER=""
+
+try_node() {
+  [ -n "$NODE" ] && return 0
+  [ -x "$1" ] || return 1
+  local v major rest minor
+  v=$("$1" -p 'process.versions.node' 2>/dev/null) || return 1
+  case "$v" in ''|*[!0-9.]*) return 1 ;; esac
+  FOUND_ANY="$1"; FOUND_VER="$v"
+  major=${v%%.*}; rest=${v#*.}; minor=${rest%%.*}
+  if [ "$major" -gt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -ge 5 ]; }; then
+    NODE="$1"
+    return 0
+  fi
+  return 1
+}
+
+# Fixed, well-known locations (Apple Silicon brew, Intel brew, MacPorts, n).
+for c in /opt/homebrew/bin/node /usr/local/bin/node /opt/local/bin/node "$HOME/n/bin/node"; do
+  try_node "$c" && break
 done
-if [ -z "$NODE" ]; then
-  nvm_node=$(ls -t "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null | head -1)
-  if [ -n "$nvm_node" ] && [ -x "$nvm_node" ]; then NODE="$nvm_node"; fi
+
+# nvm: newest install first (one path per line; safe for spaces in $HOME).
+if [ -z "$NODE" ] && [ -d "$HOME/.nvm/versions/node" ]; then
+  while IFS= read -r c; do
+    try_node "$c" && break
+  done < <(ls -t "$HOME"/.nvm/versions/node/*/bin/node 2>/dev/null)
 fi
+
+# volta
+[ -z "$NODE" ] && try_node "$HOME/.volta/bin/node"
+
+# fnm (both macOS data-dir layouts)
 if [ -z "$NODE" ]; then
-  NODE=$(command -v node 2>/dev/null || true)
+  for c in "$HOME/Library/Application Support/fnm/node-versions"/*/installation/bin/node \
+           "$HOME/.fnm/node-versions"/*/installation/bin/node; do
+    try_node "$c" && break
+  done
+fi
+
+# asdf
+if [ -z "$NODE" ]; then
+  for c in "$HOME"/.asdf/installs/nodejs/*/bin/node; do
+    try_node "$c" && break
+  done
+fi
+
+# Whatever this (minimal) PATH has.
+if [ -z "$NODE" ]; then
+  c=$(command -v node 2>/dev/null) && [ -n "$c" ] && try_node "$c"
+fi
+
+# Last resort: ask a login shell (picks up brew shellenv etc. from ~/.zprofile).
+if [ -z "$NODE" ]; then
+  c=$(/bin/zsh -l -c 'command -v node' 2>/dev/null) && [ -n "$c" ] && try_node "$c"
 fi
 
 if [ -z "$NODE" ]; then
+  if [ -n "$FOUND_ANY" ]; then
+    note "Claudiogram needs Node.js 22.5 or newer. The newest Node found on this Mac is $FOUND_VER (at $FOUND_ANY). Update Node, then double-click Claudiogram again."
+    exit 1
+  fi
   btn=$(/usr/bin/osascript -e 'display dialog "Claudiogram needs Node.js 22.5 or newer, and none was found on this Mac.
 
 Install the LTS version from nodejs.org, then double-click Claudiogram again." with title "Claudiogram" buttons {"Cancel","Open nodejs.org"} default button "Open nodejs.org" with icon caution' 2>/dev/null)
-  case "$btn" in *"Open nodejs.org"*) /usr/bin/open "https://nodejs.org/";; esac
+  case "$btn" in *"Open nodejs.org"*) /usr/bin/open "https://nodejs.org/" ;; esac
   exit 1
 fi
-
-# Version gate: node:sqlite needs >= 22.5
-ver=$("$NODE" -p 'process.versions.node' 2>/dev/null || echo "0.0.0")
-major=${ver%%.*}; rest=${ver#*.}; minor=${rest%%.*}
-if [ "$major" -lt 22 ] || { [ "$major" -eq 22 ] && [ "$minor" -lt 5 ]; }; then
-  note "Claudiogram needs Node.js 22.5 or newer (found $ver at $NODE). Update Node, then try again."
-  exit 1
-fi
+# ---------------------------------------------------------------------------
 
 if [ ! -f "$PROJECT/server.js" ]; then
   note "Claudiogram couldn't find server.js next to the app. Keep Claudiogram.app inside the Claudiogram folder (drag it to the Dock for quick access — don't move it out)."
   exit 1
 fi
 
-mkdir -p "$(dirname "$LOG")"
-cd "$PROJECT" || exit 1
+mkdir -p "$(dirname "$LOG")" 2>/dev/null || LOG="${TMPDIR:-/tmp}/claudiogram.log"
+cd "$PROJECT" || { note "Claudiogram couldn't enter the project folder at: $PROJECT"; exit 1; }
 PORT="$PORT" nohup "$NODE" server.js >> "$LOG" 2>&1 &
 
 # Wait for the server to come up (first-ever scan can take a few seconds).
 for _ in $(seq 1 60); do
   if /usr/bin/curl -s -o /dev/null --max-time 1 "$URL"; then
-    /usr/bin/open "$URL"
+    /usr/bin/open "$URL" || note "Claudiogram started, but the dashboard could not be opened. Visit $URL in your browser."
     exit 0
   fi
   sleep 0.5

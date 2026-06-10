@@ -7,9 +7,18 @@ if not defined CLAUDIOGRAM_PORT set "CLAUDIOGRAM_PORT=4242"
 set "URL=http://localhost:%CLAUDIOGRAM_PORT%"
 set "LOG=%TEMP%\claudiogram.log"
 
+:: curl is built into Windows 10 1803+ and Windows 11; without it, fail clearly.
+where curl >NUL 2>NUL
+if errorlevel 1 (
+  echo This launcher needs curl, which is built into Windows 10 ^(version 1803, April 2018^) and later.
+  echo Please update Windows, then run this again.
+  pause
+  exit /b 1
+)
+
 :: Already running? Just open the dashboard.
 curl -s -o NUL --max-time 2 "%URL%" 2>NUL
-if %errorlevel%==0 (
+if not errorlevel 1 (
   start "" "%URL%"
   exit /b 0
 )
@@ -30,7 +39,11 @@ if errorlevel 1 (
   exit /b 1
 )
 
-cd /d "%PROJECT%"
+cd /d "%PROJECT%" || (
+  echo Could not open the Claudiogram folder at "%PROJECT%".
+  pause
+  exit /b 1
+)
 if not exist server.js (
   echo server.js not found next to this launcher. Keep Claudiogram.bat inside the Claudiogram folder.
   pause
@@ -38,14 +51,16 @@ if not exist server.js (
 )
 
 echo Starting Claudiogram...
-start "Claudiogram server" /min cmd /c "set PORT=%CLAUDIOGRAM_PORT%&& node server.js >> "%LOG%" 2>&1"
+:: PORT is inherited by the child process; cmd /s makes the nested log-path quotes unambiguous.
+set "PORT=%CLAUDIOGRAM_PORT%"
+start "Claudiogram server" /min cmd /s /c "node server.js >> "%LOG%" 2>&1"
 
 :: Wait for the server to come up (first-ever scan can take a few seconds).
 for /l %%i in (1,1,30) do (
   curl -s -o NUL --max-time 1 "%URL%" 2>NUL && goto :up
   timeout /t 1 /nobreak >NUL
 )
-echo Claudiogram did not start in time. Check the log: %LOG%
+echo Claudiogram did not start in time. Check the log: "%LOG%"
 pause
 exit /b 1
 

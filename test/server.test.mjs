@@ -41,15 +41,19 @@ before(async () => {
   }
   throw new Error('server did not come up');
 });
-after(() => {
-  child?.kill();
-  fs.rmSync(TMP, { recursive: true, force: true });
+after(async () => {
+  if (child && child.exitCode === null) {
+    const gone = new Promise((resolve) => child.once('exit', resolve));
+    child.kill();
+    await gone; // Windows: the data dir stays locked until the child fully exits
+  }
+  fs.rmSync(TMP, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
 test('serves the app shell', async () => {
   const res = await fetch(base + '/');
   assert.equal(res.status, 200);
-  assert.match(await res.text(), /CLAUDE\s*&nbsp;?PULSE|<!DOCTYPE html>/i);
+  assert.match(await res.text(), /CLAUDIOGRAM|<!DOCTYPE html>/i);
 });
 
 test('null byte in path → 400, process survives', async () => {
