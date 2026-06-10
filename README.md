@@ -38,6 +38,10 @@ cd Claudiogram
 node server.js          # → http://localhost:4242
 ```
 
+No git? Grab a ready-made bundle for your platform from the
+[**latest release**](https://github.com/singhpratech/Claudiogram/releases/latest)
+(SHA-256 checksums included).
+
 Requires [Node.js](https://nodejs.org) ≥ 22.5 (uses the built-in `node:sqlite`).
 No `npm install` — there is nothing to install.
 
