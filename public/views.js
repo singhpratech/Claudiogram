@@ -1040,6 +1040,9 @@ export function renderCost(root, ctx = {}) {
 
 export function renderCapsule(root, ctx = {}) {
   const vcp = vs.capsule;
+  // Filter arrives via the hash (#/capsule?project=…) so re-renders always go
+  // through the router; '' clears, absent keeps the sticky value.
+  if (ctx.project != null) vcp.project = ctx.project || null;
   if (root._cleanup) { root._cleanup(); root._cleanup = null; }
   if (ctx.from && ctx.to) {
     const f = parseDayKey(ctx.from), t = parseDayKey(ctx.to);
@@ -1234,8 +1237,10 @@ export function renderCapsule(root, ctx = {}) {
       const c = H('button', 'chip' + (vcp.project === pr.project ? ' active' : ''));
       c.textContent = (vcp.project === pr.project ? '✕ ' : '') + pr.project;
       c.addEventListener('click', () => {
-        vcp.project = vcp.project === pr.project ? null : pr.project;
-        renderCapsule(root, {});
+        // Navigate through the router — a direct re-render would orphan the
+        // handle app.js holds (stale latch/SSE hooks, leaked scroll listener).
+        const next = vcp.project === pr.project ? '' : encodeURIComponent(pr.project);
+        location.hash = '#/capsule?project=' + next;
       });
       filterRow.appendChild(c);
     }
@@ -1357,7 +1362,7 @@ export function renderCapsule(root, ctx = {}) {
         sentinel.className = 'quiet-gap';
         if (F.offset === 0 && vcp.project) {
           const clear = H('button', 'inspect-link', ' CLEAR FILTERS ▸');
-          clear.addEventListener('click', () => { vcp.project = null; renderCapsule(root, {}); });
+          clear.addEventListener('click', () => { location.hash = '#/capsule?project='; });
           sentinel.appendChild(clear);
         }
       }

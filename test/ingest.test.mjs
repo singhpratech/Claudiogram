@@ -112,6 +112,37 @@ test('session resume replays old lines — only genuinely new data counts', asyn
   assert.deepEqual(counters().tools, { Bash: 2, Read: 1 }, 'replayed a2/a3 tool lines not recounted');
 });
 
+test('hostile lines: BOM, invalid UTF-8, poison usage, garbage timestamps, 3e9 tokens', async () => {
+  const FILE2 = path.join(PROJ_DIR, 'sess2.jsonl');
+  const mk = (uuid, msgId, usage) => line({ type: 'assistant', uuid, sessionId: 'sess2', timestamp: T(40), cwd: CWD,
+    message: { id: msgId, model: 'claude-opus-4-8', usage, content: [{ type: 'text', text: 'x' }] } });
+  fs.writeFileSync(FILE2, Buffer.concat([
+    Buffer.from([0xef, 0xbb, 0xbf]), // UTF-8 BOM glued to the first line
+    Buffer.from(line({ type: 'user', uuid: 'u20', sessionId: 'sess2', timestamp: T(39), cwd: CWD,
+      message: { role: 'user', content: 'hostile fixtures' } })),
+    Buffer.from(mk('a20', 'msg_p1', { input_tokens: true, output_tokens: { a: 1 }, cache_read_input_tokens: 'abc' })),
+    Buffer.from(mk('a21', 'msg_p2', { input_tokens: -50, output_tokens: 3000000000 })),
+    Buffer.from(line({ type: 'assistant', uuid: 'a22', sessionId: 'sess2', timestamp: '9999-01-01T00:00:00Z', cwd: CWD,
+      message: { id: 'msg_p3', model: 'claude-opus-4-8', usage: USAGE, content: [{ type: 'text', text: 'x' }] } })),
+    Buffer.concat([Buffer.from('{"bad": "'), Buffer.from([0xff, 0xfe, 0x80]), Buffer.from('"}\n')]),
+    Buffer.from(mk('a23', 'msg_p4', USAGE)), // valid line AFTER invalid bytes must still ingest
+  ]));
+  await fullScan({ dir: PROJECTS });
+
+  const m = db.prepare(`SELECT COUNT(*) AS n, COALESCE(SUM(input_tokens + output_tokens), 0) AS tok
+                        FROM messages WHERE session_id = 'sess2'`).get();
+  assert.equal(Number(m.n), 3, 'poison + negative + tail counted; year-9999 line skipped');
+  assert.equal(Number(m.tok), 3000000150, 'poison→0, -50→0, 3e9 kept, tail 150 — offsets survived invalid UTF-8');
+  const s = db.prepare(`SELECT user_msgs, tokens FROM sessions WHERE id = 'sess2'`).get();
+  assert.equal(Number(s.user_msgs), 1, 'BOM-prefixed first line still parsed');
+  assert.equal(Number(s.tokens), 3000000150, 'no int32 wrap at 3e9 session tokens');
+
+  const snap = counters();
+  await fullScan({ dir: PROJECTS });
+  assert.deepEqual(counters(), snap, 'hostile file re-scan is still a no-op');
+  assert.equal(Number(db.prepare(`SELECT COUNT(*) AS n FROM messages WHERE session_id = 'sess2'`).get().n), 3);
+});
+
 test('truncated trailing line is left for the next pass, then picked up', async () => {
   const beforeC = counters();
   const full = fs.readFileSync(FILE, 'utf8');

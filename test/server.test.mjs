@@ -77,6 +77,24 @@ test('unknown API route → 404 JSON, not a crash', async () => {
   assert.equal(res.status, 404);
 });
 
+test('absurd numeric query params are clamped, never 500', async () => {
+  for (const q of ['offset=1e19', 'offset=100000000000000000000', 'limit=1e19&offset=9.5e18']) {
+    const res = await fetch(base + `/api/sessions?${q}`);
+    assert.equal(res.status, 200, q);
+  }
+});
+
+test('oversized story body → 413 JSON, not a connection reset', async () => {
+  const res = await fetch(base + '/api/story', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: 'x'.repeat(1024 * 1024 + 64),
+  });
+  assert.equal(res.status, 413);
+  assert.equal((await res.json()).error, 'body too large');
+  assert.equal((await fetch(base + '/')).status, 200, 'server must still be alive');
+});
+
 test('API works against an empty database (fresh-install path)', async () => {
   const res = await fetch(base + '/api/summary');
   assert.equal(res.status, 200);

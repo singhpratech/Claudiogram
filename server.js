@@ -60,8 +60,12 @@ function readBody(req, limit = 1024 * 1024) {
     req.on('data', (c) => {
       size += c.length;
       if (size > limit) {
-        reject(new Error('body too large'));
-        req.destroy();
+        // Don't destroy the socket here — the caller still needs to deliver
+        // the 413 response on it. Pause so we stop buffering the flood.
+        req.pause();
+        const err = new Error('body too large');
+        err.status = 413;
+        reject(err);
         return;
       }
       chunks.push(c);
@@ -146,7 +150,9 @@ const routes = {
     let limit = qNum(url, 'limit') ?? 50;
     limit = Math.max(1, Math.min(500, Math.floor(limit)));
     let offset = qNum(url, 'offset') ?? 0;
-    offset = Math.max(0, Math.floor(offset));
+    // Cap at MAX_SAFE_INTEGER: anything above int64 max binds as REAL and
+    // SQLite's OFFSET clause throws a datatype mismatch.
+    offset = Math.max(0, Math.min(Math.floor(offset), Number.MAX_SAFE_INTEGER));
     return db.sessions({
       from: qNum(url, 'from'),
       to: qNum(url, 'to'),
@@ -166,8 +172,11 @@ async function handleStory(req, res) {
   try {
     const raw = await readBody(req);
     if (raw) body = JSON.parse(raw);
-  } catch {
-    return sendJson(res, 400, { error: 'invalid JSON body' });
+  } catch (err) {
+    const tooBig = err && err.status === 413;
+    res.writeHead(tooBig ? 413 : 400, { 'Content-Type': 'application/json', Connection: 'close' });
+    res.end(JSON.stringify({ error: tooBig ? 'body too large' : 'invalid JSON body' }), () => req.destroy());
+    return;
   }
   const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? undefined : Number(v));
   const from = num(body.from);

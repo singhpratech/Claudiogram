@@ -247,10 +247,12 @@ function parseHash() {
   const segs = pathPart.split('/').filter(Boolean);
   const q = new URLSearchParams(queryPart || '');
   const id = segs[0] || 'pulse';
+  // A malformed %-escape in a deep link must not throw out of the router.
+  const dec = (s) => { try { return decodeURIComponent(s); } catch { return s; } };
   if (id === 'day' && segs[1]) return { overlay: 'day', date: segs[1] };
-  if (id === 'project' && segs[1]) return { view: 'project', name: decodeURIComponent(segs[1]) };
+  if (id === 'project' && segs[1]) return { view: 'project', name: dec(segs[1]) };
   if (id === 'session' && segs[1]) return { view: 'capsule', session: segs[1] };
-  if (id === 'capsule') return { view: 'capsule', month: segs[1] || null, from: q.get('from'), to: q.get('to') };
+  if (id === 'capsule') return { view: 'capsule', month: segs[1] || null, from: q.get('from'), to: q.get('to'), project: q.get('project') };
   // 'project' without a name segment must not hit the generic fallback —
   // it would render a junk view querying ?project=undefined
   if (VIEWS[id] && id !== 'project') return { view: id };
