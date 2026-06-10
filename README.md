@@ -66,7 +66,9 @@ The macOS launcher hunts for Node beyond the PATH (Homebrew, nvm, volta, fnm,
 asdf, n); Windows and Linux use your PATH. All three gate on the version,
 survive install paths with spaces, and reuse an already-running server.
 `PORT=xxxx` changes the port (`CLAUDIOGRAM_PORT` for the launchers).
-Windows needs build 1803+ (built-in `curl`).
+Windows needs build 1803+ (built-in `curl`). The server binds **127.0.0.1
+only** — nobody on your network can see it (set `HOST=0.0.0.0` if you
+explicitly want LAN access).
 
 ## The four instruments
 

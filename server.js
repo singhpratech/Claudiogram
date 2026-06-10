@@ -274,7 +274,11 @@ watch((newMessages) => {
   sseBroadcast({ type: 'refresh' });
 });
 
-server.listen(PORT, () => {
+// Localhost-only by default: this dashboard exposes your full usage history
+// and a claude-CLI shell-out — it must not be reachable from the LAN unless
+// the user explicitly opts in with HOST=0.0.0.0.
+const HOST = process.env.HOST || '127.0.0.1';
+server.listen(PORT, HOST, () => {
   console.log(
     `[claudiogram] ready on http://localhost:${PORT} — ` +
     `${db.countMessages()} rows (${scan.newMessages} new) from ${scan.files} files, scan ${scan.ms}ms`,
