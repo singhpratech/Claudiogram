@@ -19,7 +19,7 @@ counted correctly.
 
 **Zero npm dependencies · Zero telemetry · Zero writes outside its own folder**
 
-<img src="docs/pulse.png" alt="The live PULSE view — a phosphor ECG of your tokens" width="850">
+<img src="docs/demo.gif" alt="The live PULSE view beating in real time — a phosphor ECG of your tokens" width="850">
 
 </div>
 
@@ -78,6 +78,8 @@ An ECG for your AI. The trace above beats in real time — fed over SSE the
 moment Claude Code writes a line, in any project, in any terminal. Burn
 windows for the last 1h/5h/24h against your typical day, plus an honest pace
 projection for where today is heading.
+
+![PULSE view](docs/pulse.png)
 
 ### F2 · RHYTHM — when you actually work
 
@@ -159,8 +161,8 @@ CLAUDIOGRAM_PROJECTS_DIR=/tmp/cp-demo/projects \
 CLAUDIOGRAM_DATA_DIR=/tmp/cp-demo/data PORT=4243 node server.js
 ```
 
-All screenshots in this README come from demo mode — fake projects, fake
-prompts, seeded PRNG.
+Every screenshot and the demo GIF in this README come from demo mode — fake
+projects, fake prompts, seeded PRNG.
 
 ## Under the hood
 
